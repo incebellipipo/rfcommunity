@@ -50,7 +50,8 @@ class Rfcommunity {
 
   private:
     int dev_number_ = 0;
-    int rfcomm_raw_tty_ = 0;
+    char devname_[MAXPATHLEN];
+    int rfcomm_raw_tty_ = 1;
 
     int s_socket_conn_;
     int c_socket_conn_;

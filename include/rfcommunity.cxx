@@ -59,39 +59,46 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
     return false;
   }
 
+  int ioctl_result;
   memset(&current_dev_req_, 0, sizeof(current_dev_req_));
   current_dev_req_.dev_id = (int16_t)dev_number_;
   current_dev_req_.flags = (1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP);
   bacpy(&current_dev_req_.src, &laddr.rc_bdaddr);
   bacpy(&current_dev_req_.dst, &raddr.rc_bdaddr);
   current_dev_req_.channel = raddr.rc_channel;
-  dev_number_ = ioctl(socket_conn_, RFCOMMCREATEDEV, &current_dev_req_);
+  ioctl_result = ioctl(socket_conn_, RFCOMMCREATEDEV, &current_dev_req_);
 
-  if (dev_number_ < 0) {
-    perror("WARN : Can't create RFCOMM TTY");
+  if (ioctl_result < 0) {
     if( errno == EADDRINUSE){
-      std::cout << strerror(errno) << std::endl;
+      std::cout << "WARN : Can't create RFCOMM TTY " << strerror(errno) << std::endl;
+      while(ioctl_result < 0){
+        dev_number_++;
+        std::cout << "INFO : Trying to connect to port: " << dev_number_ << "." << std::endl;
+        current_dev_req_.dev_id = (int16_t)dev_number_;
+        ioctl_result = ioctl(socket_conn_, RFCOMMCREATEDEV, &current_dev_req_);
+      }
+
     }
     return false;
   }
-
-  snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
-  while ((file_descriptor_ = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
+  dev_number_ = ioctl_result;
+  snprintf(devname_, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
+  while ((file_descriptor_ = open(devname_, O_RDONLY | O_NOCTTY)) < 0) {
     if (errno == EACCES) {
-      perror("Can't open RFCOMM device");
+      std::cout << "Can't open RFCOMM device " << strerror(errno) << std::endl;
       Disconnect();
       release_dev_(dev_number_);
       return false;
     }
-    snprintf(devname, MAXPATHLEN - 1, "/dev/bluetooth/rfcomm/%d", dev_number_);
-    if ((file_descriptor_ = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
+    snprintf(devname_, MAXPATHLEN - 1, "/dev/bluetooth/rfcomm/%d", dev_number_);
+    if ((file_descriptor_ = open(devname_, O_RDONLY | O_NOCTTY)) < 0) {
       if (try_t--) {
-        snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
+        snprintf(devname_, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
         usleep(100 * 1000);
         std::cout << try_t << std::endl;
         continue;
       }
-      perror("Can't open RFCOMM device");
+      std::cout << "Can't open RFCOMM device " << strerror(errno) << std::endl;
       Disconnect();
       release_dev_(dev_number_);
       return false;
@@ -104,11 +111,12 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   }
   close(socket_conn_);
   ba2str(&current_dev_req_.dst, dst);
-  printf("Connected %s to %s on channel %d\n", devname, dst, current_dev_req_.channel);
+  printf("Connected %s to %s on channel %d\n", devname_, dst, current_dev_req_.channel);
   is_connected_ = true;
   return true;
 }
 
+// TODO not finished
 bool Rfcommunity::Disconnect() {
   struct pollfd p;
   p.fd = file_descriptor_;
@@ -120,16 +128,18 @@ bool Rfcommunity::Disconnect() {
   if(poll(&p, 1, time_out) > 0){
     // todo you can check for what it is on following url
     // http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
+    is_connected_ = false;
     return true;
   }
   return false;
 }
 
 bool Rfcommunity::Release() {
-  try{
-    release_dev_(dev_number_);
-  } catch (std::runtime_error e) {
-    throw e;
+  try {
+    release_all_();
+  } catch (std::runtime_error e){
+    std::cout << e.what() << std::endl;
+    return false;
   }
   return true;
 }
@@ -164,23 +174,22 @@ bool Rfcommunity::release_all_() {
   int i;
   dl = (rfcomm_dev_list_req *) malloc(sizeof(*dl) + RFCOMM_MAX_DEV * sizeof(*di));
   if (!dl) {
-    perror("Can't allocate memory");
-    exit(1);
+    throw std::runtime_error(std::string("Can't allocate memory") + strerror(errno));
   }
   dl->dev_num = RFCOMM_MAX_DEV;
   di = dl->dev_info;
   if (ioctl(ctl_, RFCOMMGETDEVLIST, (void *) dl) < 0) {
-    perror("Can't get device list");
     free(dl);
-    exit(1);
+    throw std::runtime_error(std::string("Can't get device list ") + strerror(errno));
   }
   for (i = 0; i < dl->dev_num; i++)
     release_dev_((di + i)->id);
   free(dl);
-  return 0;
+  return true;
 
 }
 
+// TODO not finished
 bool Rfcommunity::Bind(const char *dev_addr, const char *remote_addr, int channel) {
   std::cout << "Bind method " << std::endl;
 
