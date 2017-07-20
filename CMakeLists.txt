@@ -3,6 +3,8 @@ project(rfcommunity)
 
 set(CMAKE_CXX_STANDARD 14)
 
+## LIBRARY DECLERATION
+
 find_package(Boost QUIET REQUIRED program_options system thread regex)
 set(INCLUDE_DIRS
         include
@@ -12,6 +14,23 @@ set(INCLUDE_DIRS
 include_directories(${INCLUDE_DIRS})
 
 add_library(rfcommunity include/rfcommunity.cxx)
+
+target_include_directories(rfcommunity PRIVATE
+        ${INCLUDE_DIRS}
+        )
+
+target_link_libraries(rfcommunity
+        ${Bluetooth_LIBRARIES}
+        Boost::system
+        Boost::thread
+        Boost::regex
+        Boost::program_options
+        ${Boost_LIBRARIES}
+        "${YARP_LIBRARIES};m;bluetooth"
+        )
+
+
+## EXECUTABLE DECLERATION
 
 set(SOURCE_FILES main.cpp)
 add_executable(main ${SOURCE_FILES})
@@ -24,5 +43,6 @@ target_link_libraries(main
         Boost::program_options
         ${Boost_LIBRARIES}
         "${YARP_LIBRARIES};m;bluetooth"
+        rfcommunity
         )
 

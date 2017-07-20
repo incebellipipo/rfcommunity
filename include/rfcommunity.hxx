@@ -3,30 +3,74 @@
 
 #include <iostream>
 
-namespace rfcommunity {
-    class Rfcommunity {
-    public:
-        Rfcommunity(void);
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <signal.h>
+#include <termios.h>
+#include <poll.h>
+#include <sys/param.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <bluetooth/hci_lib.h>
+#include <bluetooth/rfcomm.h>
 
-        ~Rfcommunity(void);
+class Rfcommunity {
+  public:
+    Rfcommunity(void);
 
-        int Connect(const char *dev_name, const char *remote_addr, int channel);
+    ~Rfcommunity(void);
 
-        int Bind(const char *dev_name, const char *remote_addr, int channel);
+    bool Connect(const char *dev_name, const char *remote_addr, int channel);
+    int Bind(const char *dev_name, const char *remote_addr, int channel);
+    int Release(const char *dev_name);
+    int Show(const char *dev_name);
+    int Listen(const char *dev_name, int channel);
+    int Watch(const char *dev_name, int channel);
 
-        int Release(const char *dev_name);
+    int Disconnect(const char *remote_addr);
 
-        int Show(const char *dev_name);
+    bool isConnected();
 
-        int Listen(const char *dev_name, int channel);
+  private:
+    int dev_number;
+    int rfcomm_raw_tty = 0;
+    int auth = 0;
+    int encryption = 0;
+    int secure = 0;
+    int master = 0;
+    int linger = 0;
+    int ctl;
+    int file_descriptor;
 
-        int Watch(const char *dev_name, int channel);
+    char *rfcomm_flagstostr(uint32_t flags)
+    {
+      static char str[100];
+      str[0] = 0;
+      strcat(str, "[");
+      if (flags & (1 << RFCOMM_REUSE_DLC))
+        strcat(str, "reuse-dlc ");
+      if (flags & (1 << RFCOMM_RELEASE_ONHUP))
+        strcat(str, "release-on-hup ");
+      if (flags & (1 << RFCOMM_TTY_ATTACHED))
+        strcat(str, "tty-attached");
+      strcat(str, "]");
+      return str;
+    }
 
-        int Disconnect(const char *remote_addr);
+  private:
+    bool is_connected = false;
 
-    private:
+};
 
-
-    };
-}
 #endif
