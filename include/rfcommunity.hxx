@@ -32,10 +32,16 @@ class Rfcommunity {
     ~Rfcommunity(void);
 
     bool Connect(const char *dev_addr, const char *remote_addr, int channel);
-    int Bind(const char *dev_name, const char *remote_addr, int channel);
-    bool Release(const char *dev_addr);
+
+    bool Bind(const char *dev_name, const char *remote_addr, int channel);
+
+    bool Release(int dev_id);
+    bool Release();
+
     int Show(const char *dev_name);
+
     int Listen(const char *dev_name, int channel);
+
     int Watch(const char *dev_name, int channel);
 
     bool Disconnect();
@@ -43,34 +49,32 @@ class Rfcommunity {
     bool isConnected();
 
   private:
-    int dev_number;
-    int rfcomm_raw_tty = 0;
+    int dev_number_ = 0;
+    int rfcomm_raw_tty_ = 0;
+
+    int s_socket_conn_;
+    int c_socket_conn_;
+    int b_socket_conn_;
+    int fd_socket_conn_;
+
+    int socket_conn_;
+
+
+    int connect_val_;
     int auth = 0;
     int encryption = 0;
     int secure = 0;
     int master = 0;
     int linger = 0;
-    int ctl;
-    int file_descriptor;
+    int ctl_;
+    int file_descriptor_;
+    struct rfcomm_dev_req current_dev_req_;
 
-    char *rfcomm_flagstostr(uint32_t flags)
-    {
-      static char str[100];
-      str[0] = 0;
-      strcat(str, "[");
-      if (flags & (1 << RFCOMM_REUSE_DLC))
-        strcat(str, "reuse-dlc ");
-      if (flags & (1 << RFCOMM_RELEASE_ONHUP))
-        strcat(str, "release-on-hup ");
-      if (flags & (1 << RFCOMM_TTY_ATTACHED))
-        strcat(str, "tty-attached");
-      strcat(str, "]");
-      return str;
-    }
 
   private:
-    bool is_connected = false;
-    bool release_dev(void);
+    bool is_connected_ = false;
+    bool release_dev_(int dev);
+    bool release_all_(void);
 
 };
 

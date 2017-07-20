@@ -2,13 +2,13 @@
 
 
 Rfcommunity::Rfcommunity() {
-  ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_RFCOMM);
-  std::cout << "Rfcommunity construstor " << ctl << std::endl;
+  ctl_ = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_RFCOMM);
+  std::cout << "Rfcommunity construstor " << ctl_ << std::endl;
 }
 
 Rfcommunity::~Rfcommunity() {
-  std::cout << "Rfcommunity destructor " << ctl << std::endl;
-  close(ctl);
+  std::cout << "Rfcommunity destructor " << ctl_ << std::endl;
+  close(ctl_);
 }
 
 bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int channel) {
@@ -17,14 +17,10 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   struct rfcomm_dev_req req;
   struct termios ti;
   struct sigaction sa;
-  struct pollfd p;
   sigset_t sigs;
   socklen_t alen;
   char dst[18], devname[MAXPATHLEN];
-  int sk, file_descriptor, try_t = 30;
-
-  // TODO experimental
-  int linger = 1;
+  int try_t = 30;
 
 
   // Device the you want to connect WITH.
@@ -37,103 +33,179 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   // Device that you want to connect TO.
   raddr.rc_family = AF_BLUETOOTH;
   str2ba(remote_addr, &raddr.rc_bdaddr);
-  raddr.rc_channel = channel;
+  raddr.rc_channel = (uint8_t )channel;
 
 
-  sk = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
-  if (sk < 0) {
+  socket_conn_ = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
+  if (socket_conn_ < 0) {
     perror("Can't create RFCOMM socket");
     return false;
   }
-  if (linger) {
-    struct linger l = { .l_onoff = 1, .l_linger = linger };
-    if (setsockopt(sk, SOL_SOCKET, SO_LINGER, &l, sizeof(l)) < 0) {
-      perror("Can't set linger option");
-      return false;
-    }
-  }
-  if (bind(sk, (struct sockaddr *) &laddr, sizeof(laddr)) < 0) {
+  if (bind(socket_conn_, (struct sockaddr *) &laddr, sizeof(laddr)) < 0) {
     perror("Can't bind RFCOMM socket");
-    close(sk);
+    close(socket_conn_);
     return false;
   }
-  if (connect(sk, (struct sockaddr *) &raddr, sizeof(raddr)) < 0) {
+  if (connect(socket_conn_, (struct sockaddr *) &raddr, sizeof(raddr)) < 0) {
     perror("Can't connect RFCOMM socket");
-    close(sk);
+    close(socket_conn_);
     return false;
   }
+  connect_val_ = socket_conn_;
   alen = sizeof(laddr);
-  if (getsockname(sk, (struct sockaddr *)&laddr, &alen) < 0) {
+  if (getsockname(socket_conn_, (struct sockaddr *)&laddr, &alen) < 0) {
     perror("Can't get RFCOMM socket name");
-    close(sk);
+    close(socket_conn_);
     return false;
   }
-  memset(&req, 0, sizeof(req));
-  req.dev_id = (int16_t)dev_number;
-  req.flags = (1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP);
-  bacpy(&req.src, &laddr.rc_bdaddr);
-  bacpy(&req.dst, &raddr.rc_bdaddr);
-  req.channel = raddr.rc_channel;
-  dev_number = ioctl(sk, RFCOMMCREATEDEV, &req);
-  if (dev_number < 0) {
-    perror("Can't create RFCOMM TTY");
-    close(sk);
+
+  memset(&current_dev_req_, 0, sizeof(current_dev_req_));
+  current_dev_req_.dev_id = (int16_t)dev_number_;
+  current_dev_req_.flags = (1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP);
+  bacpy(&current_dev_req_.src, &laddr.rc_bdaddr);
+  bacpy(&current_dev_req_.dst, &raddr.rc_bdaddr);
+  current_dev_req_.channel = raddr.rc_channel;
+  dev_number_ = ioctl(socket_conn_, RFCOMMCREATEDEV, &current_dev_req_);
+
+  if (dev_number_ < 0) {
+    perror("WARN : Can't create RFCOMM TTY");
+    if( errno == EADDRINUSE){
+      std::cout << strerror(errno) << std::endl;
+    }
     return false;
   }
-  snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number);
-  while ((file_descriptor = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
+
+  snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
+  while ((file_descriptor_ = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
     if (errno == EACCES) {
       perror("Can't open RFCOMM device");
+      Disconnect();
+      release_dev_(dev_number_);
+      return false;
     }
-    snprintf(devname, MAXPATHLEN - 1, "/dev/bluetooth/rfcomm/%d", dev_number);
-    if ((file_descriptor = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
+    snprintf(devname, MAXPATHLEN - 1, "/dev/bluetooth/rfcomm/%d", dev_number_);
+    if ((file_descriptor_ = open(devname, O_RDONLY | O_NOCTTY)) < 0) {
       if (try_t--) {
-        snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number);
+        snprintf(devname, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
         usleep(100 * 1000);
+        std::cout << try_t << std::endl;
         continue;
       }
       perror("Can't open RFCOMM device");
+      Disconnect();
+      release_dev_(dev_number_);
+      return false;
     }
   }
-  if (rfcomm_raw_tty) {
-    tcflush(file_descriptor, TCIOFLUSH);
+  if (rfcomm_raw_tty_) {
+    tcflush(file_descriptor_, TCIOFLUSH);
     cfmakeraw(&ti);
-    tcsetattr(file_descriptor, TCSANOW, &ti);
+    tcsetattr(file_descriptor_, TCSANOW, &ti);
   }
-  close(sk);
-  ba2str(&req.dst, dst);
-  printf("Connected %s to %s on channel %d\n", devname, dst, req.channel);
-
-  p.fd = file_descriptor;
-  p.events = POLL_ERR | POLL_HUP;
-  p.revents = 0;
-  if(poll(&p, 1, NULL) > 0){
-    std::cout << "something good happend but i don't know what" << std::endl;
-    // todo you can check for what it is on following url
-    // http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
-    return true;
-  }
+  close(socket_conn_);
+  ba2str(&current_dev_req_.dst, dst);
+  printf("Connected %s to %s on channel %d\n", devname, dst, current_dev_req_.channel);
+  is_connected_ = true;
   return true;
 }
 
 bool Rfcommunity::Disconnect() {
-    close(file_descriptor);
+  struct pollfd p;
+  p.fd = file_descriptor_;
+  p.events = POLL_ERR | POLL_HUP;
+  p.revents = 0;
+
+  // todo set timeout is weird;
+  int time_out = 10;
+  if(poll(&p, 1, time_out) > 0){
+    // todo you can check for what it is on following url
+    // http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
+    return true;
+  }
+  return false;
 }
 
-bool Rfcommunity::Release(const char *dev_addr) {
-
-}
-
-bool Rfcommunity::release_dev() {
-  struct rfcomm_dev_req req;
-  int err;
-
-  memset(&req, 0, sizeof(req));
-  req.dev_id = (int16_t) dev_number;
-
-  if (ioctl(ctl, RFCOMMRELEASEDEV, &req) < 0){
-    perror("Can't release device");
-    return false;
+bool Rfcommunity::Release() {
+  try{
+    release_dev_(dev_number_);
+  } catch (std::runtime_error e) {
+    throw e;
   }
   return true;
 }
+
+bool Rfcommunity::Release(int dev_id) {
+  release_dev_(dev_id);
+}
+
+bool Rfcommunity::release_dev_(int dev) {
+//  if(!is_connected_){
+//    throw std::runtime_error(std::string("Can not release a port which is not connected."));
+//  }
+//  struct rfcomm_dev_req req = current_dev_req_;
+  struct rfcomm_dev_req req;
+
+  memset(&req, 0, sizeof(req));
+  req.dev_id = (int16_t) dev;
+
+  if (ioctl(ctl_, RFCOMMRELEASEDEV, &req) < 0){
+    throw std::runtime_error(std::string("Can't release device: 180: ") + strerror(errno));
+  }
+  if(close(file_descriptor_) < 0){
+    throw std::runtime_error(std::string("Can't release device: 183: ") + strerror(errno));
+  }
+  return true;
+}
+
+bool Rfcommunity::release_all_() {
+
+  struct rfcomm_dev_list_req *dl;
+  struct rfcomm_dev_info *di;
+  int i;
+  dl = (rfcomm_dev_list_req *) malloc(sizeof(*dl) + RFCOMM_MAX_DEV * sizeof(*di));
+  if (!dl) {
+    perror("Can't allocate memory");
+    exit(1);
+  }
+  dl->dev_num = RFCOMM_MAX_DEV;
+  di = dl->dev_info;
+  if (ioctl(ctl_, RFCOMMGETDEVLIST, (void *) dl) < 0) {
+    perror("Can't get device list");
+    free(dl);
+    exit(1);
+  }
+  for (i = 0; i < dl->dev_num; i++)
+    release_dev_((di + i)->id);
+  free(dl);
+  return 0;
+
+}
+
+bool Rfcommunity::Bind(const char *dev_addr, const char *remote_addr, int channel) {
+  std::cout << "Bind method " << std::endl;
+
+  struct rfcomm_dev_req req;
+  int err;
+  bdaddr_t bdaddr;
+  str2ba(dev_addr, &bdaddr);
+
+  memset(&req, 0, sizeof(req));
+  req.dev_id = dev_number_;
+  req.flags = (1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP);
+  bacpy(&req.src, &bdaddr);
+
+  str2ba(remote_addr, &req.dst);
+
+  req.channel = channel;
+  err = ioctl(ctl_, RFCOMMCREATEDEV, &req);
+  if (err == -1) {
+    err = -errno;
+    if (err == -EOPNOTSUPP)
+      fprintf(stderr, "RFCOMM TTY support not available\n");
+    else
+      perror("Can't create device");
+  }
+  return err;
+}
+
+bool Rfcommunity::isConnected() {return is_connected_;}
