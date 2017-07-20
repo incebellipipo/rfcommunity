@@ -33,7 +33,7 @@ class Rfcommunity {
 
     bool Connect(const char *dev_addr, const char *remote_addr, int channel);
 
-    bool Bind(const char *dev_name, const char *remote_addr, int channel);
+    bool Bind(const char *dev_addr, const char *remote_addr, int channel);
 
     bool Release(int dev_id);
     bool Release();
