@@ -31,14 +31,14 @@ class Rfcommunity {
 
     ~Rfcommunity(void);
 
-    bool Connect(const char *dev_name, const char *remote_addr, int channel);
+    bool Connect(const char *dev_addr, const char *remote_addr, int channel);
     int Bind(const char *dev_name, const char *remote_addr, int channel);
-    int Release(const char *dev_name);
+    bool Release(const char *dev_addr);
     int Show(const char *dev_name);
     int Listen(const char *dev_name, int channel);
     int Watch(const char *dev_name, int channel);
 
-    int Disconnect(const char *remote_addr);
+    bool Disconnect();
 
     bool isConnected();
 
@@ -70,6 +70,7 @@ class Rfcommunity {
 
   private:
     bool is_connected = false;
+    bool release_dev(void);
 
 };
 

@@ -104,14 +104,36 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   ba2str(&req.dst, dst);
   printf("Connected %s to %s on channel %d\n", devname, dst, req.channel);
 
-  printf("Disconnected\n");
-  close(file_descriptor);
+  p.fd = file_descriptor;
+  p.events = POLL_ERR | POLL_HUP;
+  p.revents = 0;
+  if(poll(&p, 1, NULL) > 0){
+    std::cout << "something good happend but i don't know what" << std::endl;
+    // todo you can check for what it is on following url
+    // http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
+    return true;
+  }
   return true;
 }
 
+bool Rfcommunity::Disconnect() {
+    close(file_descriptor);
+}
 
+bool Rfcommunity::Release(const char *dev_addr) {
 
+}
 
+bool Rfcommunity::release_dev() {
+  struct rfcomm_dev_req req;
+  int err;
 
+  memset(&req, 0, sizeof(req));
+  req.dev_id = (int16_t) dev_number;
 
-
+  if (ioctl(ctl, RFCOMMRELEASEDEV, &req) < 0){
+    perror("Can't release device");
+    return false;
+  }
+  return true;
+}
