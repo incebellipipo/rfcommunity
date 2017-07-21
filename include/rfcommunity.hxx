@@ -67,6 +67,7 @@ class Rfcommunity {
     int secure = 0;
     int master = 0;
     int linger = 0;
+
     int ctl_;
     int file_descriptor_;
     struct rfcomm_dev_req current_dev_req_;

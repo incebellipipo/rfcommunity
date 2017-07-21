@@ -1,6 +1,7 @@
 #include "rfcommunity.hxx"
 
 
+
 Rfcommunity::Rfcommunity() {
   ctl_ = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_RFCOMM);
   std::cout << "Rfcommunity construstor " << ctl_ << std::endl;
@@ -14,12 +15,10 @@ Rfcommunity::~Rfcommunity() {
 bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int channel) {
 
   struct sockaddr_rc laddr, raddr;
-  struct rfcomm_dev_req req;
+  struct rfcomm_dev_req req; // TODO Not used
   struct termios ti;
-  struct sigaction sa;
-  sigset_t sigs;
   socklen_t alen;
-  char dst[18], devname[MAXPATHLEN];
+  char dst[18];
   int try_t = 30;
 
 
@@ -114,24 +113,27 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   printf("Connected %s to %s on channel %d\n", devname_, dst, current_dev_req_.channel);
   is_connected_ = true;
   return true;
-}
 
-// TODO not finished
-bool Rfcommunity::Disconnect() {
+  // TODO this poll function used in standart rfcomm tool
   struct pollfd p;
   p.fd = file_descriptor_;
   p.events = POLL_ERR | POLL_HUP;
   p.revents = 0;
-
-  // todo set timeout is weird;
-  int time_out = 10;
-  if(poll(&p, 1, time_out) > 0){
-    // todo you can check for what it is on following url
-    // http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
-    is_connected_ = false;
+  if(poll(&p, 1, NULL) > 0){
+    // todo you can check for what it is on following
+    // man poll
     return true;
   }
   return false;
+}
+
+// TODO not finished
+bool Rfcommunity::Disconnect() {
+  if(close(file_descriptor_) < 0){
+    throw std::runtime_error(std::string("Can't disconnect device: ") + strerror(errno));
+  }
+  is_connected_ = false;
+  return true;
 }
 
 bool Rfcommunity::Release() {
@@ -149,26 +151,17 @@ bool Rfcommunity::Release(int dev_id) {
 }
 
 bool Rfcommunity::release_dev_(int dev) {
-//  if(!is_connected_){
-//    throw std::runtime_error(std::string("Can not release a port which is not connected."));
-//  }
-//  struct rfcomm_dev_req req = current_dev_req_;
   struct rfcomm_dev_req req;
-
   memset(&req, 0, sizeof(req));
   req.dev_id = (int16_t) dev;
-
   if (ioctl(ctl_, RFCOMMRELEASEDEV, &req) < 0){
-    throw std::runtime_error(std::string("Can't release device: 180: ") + strerror(errno));
+    throw std::runtime_error(std::string("Can't release device: ") + strerror(errno));
   }
-  if(close(file_descriptor_) < 0){
-    throw std::runtime_error(std::string("Can't release device: 183: ") + strerror(errno));
-  }
+  is_connected_ = false;
   return true;
 }
 
 bool Rfcommunity::release_all_() {
-
   struct rfcomm_dev_list_req *dl;
   struct rfcomm_dev_info *di;
   int i;
