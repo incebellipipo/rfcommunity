@@ -4,11 +4,9 @@
 
 Rfcommunity::Rfcommunity() {
   ctl_ = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_RFCOMM);
-  std::cout << "Rfcommunity construstor " << ctl_ << std::endl;
 }
 
 Rfcommunity::~Rfcommunity() {
-  std::cout << "Rfcommunity destructor " << ctl_ << std::endl;
   close(ctl_);
 }
 
@@ -78,7 +76,7 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
       }
 
     }
-    return false;
+    // return false;
   }
   dev_number_ = ioctl_result;
   snprintf(devname_, MAXPATHLEN - 1, "/dev/rfcomm%d", dev_number_);
@@ -112,7 +110,7 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   ba2str(&current_dev_req_.dst, dst);
   printf("Connected %s to %s on channel %d\n", devname_, dst, current_dev_req_.channel);
   is_connected_ = true;
-  return true;
+//  return true;
 
   // TODO this poll function used in standart rfcomm tool
   struct pollfd p;
@@ -122,9 +120,8 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
   if(poll(&p, 1, NULL) > 0){
     // todo you can check for what it is on following
     // man poll
-    return true;
   }
-  return false;
+  return true;
 }
 
 // TODO not finished
@@ -140,7 +137,9 @@ bool Rfcommunity::Release() {
   try {
     release_all_();
   } catch (std::runtime_error e){
-    std::cout << e.what() << std::endl;
+    std::cout << "WARN : Can't release device:" << e.what() << std::endl;
+    std::cout << "INFO : Trying to release current device with id: " << current_dev_req_.dev_id << std::endl;
+    release_dev_(current_dev_req_.dev_id);
     return false;
   }
   return true;
@@ -152,10 +151,10 @@ bool Rfcommunity::Release(int dev_id) {
 
 bool Rfcommunity::release_dev_(int dev) {
   struct rfcomm_dev_req req;
-  memset(&req, 0, sizeof(req));
   req.dev_id = (int16_t) dev;
+  memset(&req, 0, sizeof(req));
   if (ioctl(ctl_, RFCOMMRELEASEDEV, &req) < 0){
-    throw std::runtime_error(std::string("Can't release device: ") + strerror(errno));
+    throw std::runtime_error(strerror(errno));
   }
   is_connected_ = false;
   return true;
@@ -167,16 +166,23 @@ bool Rfcommunity::release_all_() {
   int i;
   dl = (rfcomm_dev_list_req *) malloc(sizeof(*dl) + RFCOMM_MAX_DEV * sizeof(*di));
   if (!dl) {
-    throw std::runtime_error(std::string("Can't allocate memory") + strerror(errno));
+    throw std::runtime_error(strerror(errno));
   }
   dl->dev_num = RFCOMM_MAX_DEV;
   di = dl->dev_info;
   if (ioctl(ctl_, RFCOMMGETDEVLIST, (void *) dl) < 0) {
     free(dl);
-    throw std::runtime_error(std::string("Can't get device list ") + strerror(errno));
+    throw std::runtime_error(strerror(errno));
   }
-  for (i = 0; i < dl->dev_num; i++)
-    release_dev_((di + i)->id);
+  for (i = 0; i < dl->dev_num; i++) {
+    try{
+      release_dev_((di + i)->id);
+    } catch (std::runtime_error e){
+      std::cout << "ERROR: Cant' release device with id: " << (di+i)->id << " caused: " << e.what() << std::endl;
+      continue;
+    }
+    std::cout << (di+i)->id << std::endl;
+  }
   free(dl);
   return true;
 

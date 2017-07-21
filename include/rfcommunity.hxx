@@ -51,7 +51,7 @@ class Rfcommunity {
   private:
     int dev_number_ = 0;
     char devname_[MAXPATHLEN];
-    int rfcomm_raw_tty_ = 1;
+    int rfcomm_raw_tty_ = 0;
 
     int s_socket_conn_;
     int c_socket_conn_;
@@ -75,6 +75,7 @@ class Rfcommunity {
 
   private:
     bool is_connected_ = false;
+    bool is_released_ = false;
     bool release_dev_(int dev);
     bool release_all_(void);
 
