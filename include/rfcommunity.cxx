@@ -35,18 +35,15 @@ bool Rfcommunity::Connect(const char *dev_addr, const char *remote_addr, int cha
 
   socket_conn_ = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
   if (socket_conn_ < 0) {
-    perror("Can't create RFCOMM socket");
-    return false;
+    throw std::runtime_error("Can't create RFCOMM socket "+strerror(errno));
   }
   if (bind(socket_conn_, (struct sockaddr *) &laddr, sizeof(laddr)) < 0) {
-    perror("Can't bind RFCOMM socket");
     close(socket_conn_);
-    return false;
+    throw std::runtime_error("Can't bind RFCOMM socket "+strerror(errno));
   }
   if (connect(socket_conn_, (struct sockaddr *) &raddr, sizeof(raddr)) < 0) {
-    perror("Can't connect RFCOMM socket");
     close(socket_conn_);
-    return false;
+    throw std::runtime_error("Can't connect RFCOMM socket" + strerror(errno));
   }
   connect_val_ = socket_conn_;
   alen = sizeof(laddr);

@@ -13,7 +13,7 @@ set(INCLUDE_DIRS
 
 include_directories(${INCLUDE_DIRS})
 
-add_library(rfcommunity include/rfcommunity.cxx)
+add_library(rfcommunity ../../catkin_ws/src/bluetooth_action/include/rfcommunity/rfcommunity.cxx)
 
 target_include_directories(rfcommunity PRIVATE
         ${INCLUDE_DIRS}
