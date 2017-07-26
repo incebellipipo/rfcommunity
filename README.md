@@ -1,4 +1,4 @@
-# Rfcomm command line tool C++ binding
+# Bluetooth Rfcomm command line tool C++ binding
 
 Hi to all. This is some silly approach to use rfcomm command line program in another purposes. 
 Rfcomm methods are simplified like;
