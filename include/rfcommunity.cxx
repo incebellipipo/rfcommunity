@@ -224,3 +224,75 @@ int Rfcommunity::f_release_all(){
   free(dl);
   return 0;
 }
+
+std::string Rfcommunity::rfcomm_flagstostr(uint32_t flags)
+{
+    static char str[100];
+    str[0] = 0;
+
+    strcat(str, "[");
+
+    if (flags & (1 << RFCOMM_REUSE_DLC))
+        strcat(str, "reuse-dlc ");
+
+    if (flags & (1 << RFCOMM_RELEASE_ONHUP))
+        strcat(str, "release-on-hup ");
+
+    if (flags & (1 << RFCOMM_TTY_ATTACHED))
+        strcat(str, "tty-attached");
+
+    strcat(str, "]");
+    return std::string(str);
+}
+
+void Rfcommunity::f_print_dev_info(rfcomm_dev_info *di){
+    char src[18], dst[18], addr[40];
+
+    ba2str(&di->src, src); ba2str(&di->dst, dst);
+
+    if (bacmp(&di->src, &m_local_bdaddr) == 0){
+        sprintf(addr, "%s", dst);
+    }
+    else{
+        sprintf(addr, "%s -> %s", src, dst);
+    }
+    printf("rfcomm%d: %s channel %d %s %s\n",
+        di->id, addr, di->channel,
+        rfcomm_state[di->state].c_str(),
+        di->flags ? rfcomm_flagstostr(di->flags).c_str() : "");
+}
+
+bool Rfcommunity::f_print_dev_list(){
+  struct rfcomm_dev_list_req *dl;
+  struct rfcomm_dev_info *di;
+  int i;
+
+  dl = (rfcomm_dev_list_req *) malloc(sizeof(*dl) + RFCOMM_MAX_DEV * sizeof(*di));
+  if(!dl){
+    perror("Can't allocate memory");
+    return false;
+  }
+  dl->dev_num = RFCOMM_MAX_DEV;
+  di = dl->dev_info;
+
+  if(ioctl(m_ctl, RFCOMMGETDEVLIST, (void *) dl) < 0 ){
+    perror("Can't get device list");
+    free(dl);
+    return false;
+  }
+  for( i = 0; i < dl->dev_num; i++){
+    f_print_dev_info(di + i);
+  }
+  free(dl);
+  return true;
+}
+
+bool Rfcommunity::f_cmd_show(int16_t dev){
+    struct rfcomm_dev_info di = { .id = dev };
+    if(ioctl(m_ctl, RFCOMMGETDEVINFO, &di) < 0){
+        perror("Get info failed");
+        return false;
+    }
+    f_print_dev_info(&di);
+    return true;
+}

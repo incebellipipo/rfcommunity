@@ -80,24 +80,42 @@ class Rfcommunity {
     std::string m_local_addr;
     std::string m_remote_addr;
 
+    std::string *rfcomm_state = new std::string[10]{
+        "unknown",
+        "connected",
+        "clean",
+        "bound",
+        "listening",
+        "connecting",
+        "connecting",
+        "config",
+        "disconnecting",
+        "closed"
+    };
+
     int f_create_dev();
     int f_release_dev();
     int f_release_dev(int dev);
     int f_release_all();
+    bool f_cmd_show(int16_t dev);
 
-    // Connect Method
+    // TODO Connect Method
     void f_cmd_connect(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
-    // Listen Method
+    // TODO Listen Method
     void f_cmd_listen(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
-    // Watch Method
+    // TODO Watch Method
     void f_cmd_watch(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
-    // Bind Method
+    // TODO Bind Method
     void f_cmd_create(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
-    // Release Method
+    // TODO Release Method
     void f_cmd_release(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
-    // Show Method
-    void f_cmd_show(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
 
+    //List devices
+    bool f_print_dev_list();
+    //Print device info
+    void f_print_dev_info(struct rfcomm_dev_info *di);
+
+    std::string rfcomm_flagstostr(uint32_t flags);
 
 
 };

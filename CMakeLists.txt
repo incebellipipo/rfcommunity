@@ -46,3 +46,9 @@ target_link_libraries(main
         rfcommunity
         )
 
+add_executable(rfcomm rfcomm.c)
+target_link_libraries(rfcomm
+    ${Bluetooth_LIBRARIES}
+    "${YARP_LIBRARIES};m;bluetooth"
+    )
+
