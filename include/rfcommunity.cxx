@@ -160,6 +160,18 @@ bool Rfcommunity::Release(){
   return m_is_released;
 }
 
+bool Rfcommunity::Show(const char *dev_name){
+  f_cmd_show(dev_name);
+}
+
+bool Rfcommunity::Show(int16_t dev){
+  f_cmd_show(dev);
+}
+
+bool Rfcommunity::Show(){
+  f_print_dev_list();
+}
+
 int Rfcommunity::f_create_dev(){
   struct rfcomm_dev_req req;
   int err;
@@ -289,6 +301,19 @@ bool Rfcommunity::f_print_dev_list(){
 
 bool Rfcommunity::f_cmd_show(int16_t dev){
     struct rfcomm_dev_info di = { .id = dev };
+    if(ioctl(m_ctl, RFCOMMGETDEVINFO, &di) < 0){
+        perror("Get info failed");
+        return false;
+    }
+    f_print_dev_info(&di);
+    return true;
+}
+
+bool Rfcommunity::f_cmd_show(const char *dev_addr){
+    struct rfcomm_dev_info di;
+    bdaddr_t bdaddr;
+    str2ba(dev_addr, &bdaddr);
+    di.dst = bdaddr;
     if(ioctl(m_ctl, RFCOMMGETDEVINFO, &di) < 0){
         perror("Get info failed");
         return false;

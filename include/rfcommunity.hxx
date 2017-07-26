@@ -41,7 +41,10 @@ class Rfcommunity {
     bool Release();
 
     // This three methods implemented in future
-    int Show(const char *dev_name);
+    bool Show(const char *dev_name);
+    bool Show(int16_t dev);
+    bool Show();
+
     int Listen(const char *dev_name, int channel);
     int Watch(const char *dev_name, int channel);
 
@@ -98,6 +101,7 @@ class Rfcommunity {
     int f_release_dev(int dev);
     int f_release_all();
     bool f_cmd_show(int16_t dev);
+    bool f_cmd_show(const char *dev_name);
 
     // TODO Connect Method
     void f_cmd_connect(int ctl, int dev, bdaddr_t *bdaddr, int argc, char **argv);
