@@ -321,3 +321,36 @@ bool Rfcommunity::f_cmd_show(const char *dev_addr){
     f_print_dev_info(&di);
     return true;
 }
+
+bool Rfcommunity::removeDuplicates(){
+  struct rfcomm_dev_list_req *dl;
+  struct rfcomm_dev_info *di;
+  int i;
+
+  dl = (rfcomm_dev_list_req *) malloc(sizeof(*dl) + RFCOMM_MAX_DEV * sizeof(*di));
+  if(!dl){
+    perror("Can't allocate memory");
+    return false;
+  }
+  dl->dev_num = RFCOMM_MAX_DEV;
+  di = dl->dev_info;
+
+  if(ioctl(m_ctl, RFCOMMGETDEVLIST, (void *) dl) < 0 ){
+    perror("Can't get device list");
+    free(dl);
+    return false;
+  }
+  int number_of_same_devices = 0;
+  for( i = 0; i < dl->dev_num; i++){
+    char addr[18];
+    ba2str(&(di + i)->dst,addr);
+    if(std::string(addr) == m_remote_addr){
+      number_of_same_devices++;
+      if(number_of_same_devices > 1){
+        f_release_dev((di + i)->id);
+      }
+    }
+  }
+  std::cout << "removed " << number_of_same_devices - 1 << " duplicates" << std::endl;
+  return true;
+}

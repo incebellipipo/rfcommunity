@@ -59,6 +59,8 @@ class Rfcommunity {
     bool isConnected(){return m_is_connected;}
     bool isBinded(){return m_is_binded;}
 
+    bool removeDuplicates();
+
     std::string getRemoteAddr(){return m_remote_addr;}
     std::string getLocalAddr(){return m_local_addr;}
 
